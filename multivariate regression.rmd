@@ -1,0 +1,59 @@
+---
+title: '12.1'
+author: "Zack Light"
+date: "December 1, 2018"
+output: html_document
+---
+
+```{r}
+price_lag <- daily_price %>% 
+  mutate(log_close = log(Close)) %>% 
+  mutate(change=(Close/lag(Close,1)-1))
+
+tweets_with_scores <- tweets_with_scores %>%
+  mutate(Date=as.Date(time, format = "%d.%m.%Y")) %>% 
+  select(Date, everything()) %>% 
+  select(-time)
+
+emotions <- colnames(tweets_with_scores)[6:15] %>% 
+  paste(shQuote(., type="sh"), collapse=", ")
+
+summarized_tweets_with_scores <- tweets_with_scores %>% 
+  group_by(Date) %>% 
+  summarize(
+    anger = mean(anger),     
+    anticipation = mean(anticipation),
+    disgust = mean(disgust),   
+    fear = mean(fear),     
+    joy = mean(joy),
+    sadness = mean(sadness),
+    surprise = mean(surprise), 
+    trust = mean(trust),
+    negative = mean(negative),
+    positive = mean(positive)
+  )
+  # colSums(tweets_with_scores[, c("anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust", "negative", "positive")], na.rm=TRUE)
+  
+# for (i in colnames(tweets_with_scores)[6:15]) {
+#   col_name = paste(i, "sum", sep='_')
+#   print(col_name)
+#   tweets_with_scores <- tweets_with_scores %>% 
+#     group_by(date)%>%
+#     mutate(!!col_name := sum(i)) %>% 
+#     group_by(date)
+# }
+
+daily_price_with_scores <- price_lag %>% 
+  mutate(Date=as.Date(Date)) %>% 
+  left_join(summarized_tweets_with_scores, by="Date") %>% 
+  .[complete.cases(.), ]
+
+(mod_num2<-lm(change~anger+anticipation+disgust+fear+joy+sadness+surprise+trust+negative+positive,data=daily_price_with_scores))
+
+daily_price_with_scores %>% gather("id", "value", 7:16) %>% 
+  ggplot(., aes(Date, value))+
+  geom_point(position = "jitter")+
+  geom_smooth(method = "lm", se=FALSE, color="blue")+
+  facet_wrap(~id)
+```
+

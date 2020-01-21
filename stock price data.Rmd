@@ -1,0 +1,108 @@
+---
+title: "data-stock price"
+author: "Official Answers"
+output: html_document
+---
+##Exploratory Data Analysis
+
+# Stock Data
+
+We get the historical data for Tesla stock from Yahoo! Finance. We take the close and open price and volume of Teala stock from 2016-11-10 to 2018-11-10.
+
+#daily price data
+
+We import the daily price and plot the log of close price over time to see how Tesla's stock price has changed over time. We also computed the basic summary statistics(mean,range,variance) of the stock price.
+
+```{r daily price}
+library(tidyverse)
+library(readr)
+library(dplyr)
+
+( daily_price<-read_csv('Data/Stock_Data/TSLA.csv')%>%
+  transmute(Date=as.character.Date(Date),Open,Close,Volume)
+)
+problems(daily_price)
+
+
+daily_price%>%ggplot()+geom_point(aes(Date,log(Close)))
+
+as.tibble(list(min=min(daily_price$Close),mean=mean(daily_price$Close),
+               max=max(daily_price$Close)))
+
+
+```
+
+As we can see from the graph, Tesla's stock price exprienced a relatively steady growth at first but started to have more volatility during the past one year or so. This is the period in which we are mainly interested in.
+
+#minutely data
+
+Considering that we may need to look into the change in stock price in more detail to see how it responded to news on social media, we also obtained the minutely price and volume data for the past 7 months from Bloomberg and imported it.
+
+```{r minutely data}
+library(readxl)
+minutely_price<- read_excel("Data/Stock_Data/bloomberg_tsla_minutely_price_04252018_11072018.xlsx", 
+                            sheet = "Sheet1")%>%transmute(Date=Dates,Open,Close,Volume)
+problems(minutely_price)
+
+minutely_price%>%ggplot()+geom_point(aes(Date,log(Close)),position="jitter")
+
+as.tibble(list(mean=mean(minutely_price$Close),min=min(minutely_price$Close),
+               max=max(minutely_price$Close),variance=var(minutely_price$Close)))
+```
+
+
+#comparing to S&P500
+
+To see how Tesla's stock change is related to the change in stock market, we compared it to the price of S&P 500. 
+
+```{r comparision}
+SP500<-read.csv('Data/^GSPC.CSV')%>%
+  transmute(Date=as.character(Date),Open_SP500=Open,Close_SP500=Close,Volume_SP500=Volume)
+
+daily_price%>%left_join(SP500,by="Date")%>%
+  ggplot(aes(Date))+geom_point(aes(y=log(Close)))+
+  geom_point(aes(y=log(Close_SP500)-2,color="red"))+
+  scale_y_continuous(sec.axis = sec_axis(~.+2,name="log(Close_SP500)"))
+
+
+
+```
+
+As shown in the graph, the correlation between S&P500 and Tesla is not very strong. While S&P500 is generally growing over time, there is more ups and downs in the stock price of Tesla. So, there must be other reasons driven the change and we believe the news and releases on social media is one big reason for that.
+
+```{r T_likes_S_price}
+elon_musk <- read.csv("data/Twitter_Data/Elon Musk (@elonmusk) _ Twitter.csv") %>% distinct()
+problems(elon_musk)
+
+elon_musk$Date <- as.Date(elon_musk$time)   
+daily_likes <- aggregate(elon_musk$likes, by=list(elon_musk$Date), sum) %>% rename( Dates = Group.1, likes = x)
+
+ daily_likes <- daily_likes %>% mutate( Date = as.character(Dates)) %>% select(Date, likes) 
+  
+ daily_price<-read_csv('Data/Stock_Data/TSLA.csv')%>%
+    transmute(Date=as.character.Date(Date),Open,Close,Volume) 
+
+
+t_elon_S_price <- inner_join(  daily_price, daily_likes, by =  "Date" ) 
+
+beta<-  coef(lm( log(Close) ~ likes , data =  t_elon_S_price)) 
+
+ggplot( t_elon_S_price ) + geom_point( aes(log(likes),log(Close)  ))+ geom_abline(aes( intercept = beta[1], slope = beta[2]), color = 'red', alpha = 0.3, size = 1 ) 
+
+
+```
+removed the largest data from dataset 
+
+```{r}
+
+t_elon_S_price <- inner_join(  daily_price, daily_likes, by =  "Date" ) 
+
+remove_ <- t_elon_S_price %>% filter ( !likes > 1000000)  
+
+beta<-  coef(lm( log(Close) ~ likes , data =  t_elon_S_price)) 
+
+ggplot( remove_ ) + geom_point( aes(log(likes),log(Close)  ))+ geom_abline(aes( intercept = beta[1], slope = beta[2]), color = 'red', alpha = 0.3, size = 1 ) 
+
+
+```
+The plot of the linear regresion that we removed few too high likes. 

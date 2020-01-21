@@ -1,0 +1,57 @@
+---
+title: "twitter_sentiment"
+author: "Zack Light"
+date: "December 1, 2018"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(gtable)
+library(syuzhet)
+library(SnowballC)
+library(NLP)
+library(tm)
+library(wordcloud)
+```
+
+```{r preprocessing}
+name <- "Elon Musk (@elonmusk) _ Twitter"
+name <- "CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search"
+name <- "(_) @elonmusk @Tesla - Twitter Search"
+import_path <- paste("data/Twitter_Data/", name, ".csv", sep='')
+tweets <- read_csv(import_path) %>% 
+  mutate(text = str_to_lower(text)) %>% 
+  mutate(text = str_replace_all(text, "https?.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "[#@].*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "pic.twitter.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "rt","")) %>% 
+  mutate(text = str_replace_all(text, "[[:punct:]]","")) %>% 
+  mutate(text = str_replace_all(text, "[ |\t]{2,}","")) %>% 
+  mutate(text = str_replace_all(text, "^\\s","")) %>% # Remove blank spaces at the beginning
+  mutate(text = str_replace_all(text, "\\s$", "")) %>% #Remove blank spaces at the end
+  mutate(text = removeWords(text,stopwords()))
+ 
+sentiment_scores <- get_nrc_sentiment(tweets$text) 
+
+tweets_with_scores <- merge(tweets, sentiment_scores, by="row.names", all.x=TRUE) %>% 
+  select(-1)
+
+export_path <- paste("data/Twitter_Data/", name, "_with_scores.csv", sep='')
+write.table(tweets_with_scores, file = export_path, sep=",", row.names=FALSE)
+# all_words <- paste(tweets$text, collapse=', ' )
+# 
+# wordcloud(all_words,min.freq = 1,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
+# word.df <- as.vector(tweets.df2)
+# 
+# emotion.df <- get_nrc_sentiment(word.df)
+# 
+# emotion.df2 <- cbind(tweets.df2, emotion.df) 
+# 
+# head(emotion.df2)
+```
+ 
+ 

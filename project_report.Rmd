@@ -1,0 +1,426 @@
+---
+title: "The Influence of Media on Tesla’s Stock Price"
+author: "Official Answers"
+date: "2018-11-12"
+output: html_document
+---
+
+#Introduction
+
+We hypothesize that news from major media outlets such as Twitter and Wall Street Journal may have a strong influence (such as correlation) on the stock price of Tesla, Inc. One might imagine that stock prices are particularly susceptible to breaking news on social media since the news reflect new market information. For instance, when Elon Musk (Tesla’s CEO) himself gives out the unplanned news, it seems like the market would experience extreme momentary fluctuations. 
+
+The purpose of the project is to analyze and (explore correlation) between social media and news platforms with stock price. We believe that if our research finds a correlation between stock movements and news, then we might be able to create trading strategies. Otherwise, the absence of correlation should teach us not to trade stocks purely based on breaking news.
+
+Methodologically, We extract data from popular news sources and social media, such as Twitter, Facebook, CNN, WSJ, etc from from 11/10/2016 to 11/10/2016. After conducting sentiment analysis (through R libraries), we use the sentiment, the number of related news, and the speed of transmission for the quanlitative analysis. We analyze Tesla’s daily stock prices and volumes from 11/10/2016 to 11/10/2016 and minutely stock prices and volumes from from 04/11/2018 to 11/10/2018. 
+
+The tool we majorly use is R language by Rstudio. We might also utilize Python if needed for specific libraries.  
+
+
+
+#Exploratory Data Analysis
+
+## Stock Data
+
+We get the historical data for Tesla stock from Yahoo! Finance. We take the close and open price and volume of Teala stock from 2016-11-10 to 2018-11-10.
+
+###daily price data
+
+We import the daily price and plot the log of close price over time to see how Tesla's stock price has changed over time. We also computed the basic summary statistics(mean,range,variance) of the stock price.
+
+```{r daily price}
+library(tidyverse)
+
+daily_price<-read.csv('Data/Stock_Data/TSLA.csv')%>%
+  transmute(Date=as.character(Date),Open,Close,Volume)
+problems(daily_price)
+
+
+daily_price%>%ggplot()+geom_point(aes(Date,log(Close)))
+
+as.tibble(list(mean=mean(daily_price$Close),min=min(daily_price$Close),
+               max=max(daily_price$Close),variance=var(daily_price$Close)))
+
+```
+
+As we can see from the graph, Tesla's stock price exprienced a relatively steady growth at first but started to have more volatility during the past one year or so. This is the period in which we are mainly interested in.
+
+###minutely data
+
+Considering that we may need to look into the change in stock price in more detail to see how it responded to news on social media, we also obtained the minutely price and volume data for the past 7 months from Bloomberg and imported it.
+
+```{r minutely data}
+library(readxl)
+minutely_price<- read_excel("Data/Stock_Data/bloomberg_tsla_minutely_price_04252018_11072018.xlsx", 
+                            sheet = "Sheet1")%>%transmute(Date=Dates,Open,Close,Volume)
+problems(minutely_price)
+
+write.table(minutely_price, file = "Data/Stock_Data/bloomberg_tsla_minutely_price_04252018_11072018.csv", sep=",", row.names=FALSE)
+
+minutely_price%>%ggplot()+geom_point(aes(Date,log(Close)),position="jitter")
+
+as.tibble(list(mean=mean(minutely_price$Close),min=min(minutely_price$Close),
+               max=max(minutely_price$Close),variance=var(minutely_price$Close)))
+```
+
+
+###comparing to S&P500
+
+To see how Tesla's stock change is related to the change in stock market, we compared it to the price of S&P 500. 
+
+```{r comparision}
+SP500<-read.csv('data/^GSPC.CSV')%>%
+  transmute(Date=as.character(Date),Open_SP500=Open,Close_SP500=Close,Volume_SP500=Volume)
+
+daily_price%>%left_join(SP500,by="Date")%>%
+  ggplot(aes(Date))+geom_point(aes(y=log(Close)))+
+  geom_point(aes(y=log(Close_SP500)-2,color="red"))+
+  scale_y_continuous(sec.axis = sec_axis(~.+2,name="log(Close_SP500)"))
+
+
+
+```
+
+As shown in the graph, the correlation between S&P500 and Tesla is not very strong. While S&P500 is generally growing over time, there is more ups and downs in the stock price of Tesla. So, there must be other reasons driven the change and we believe the news and releases on social media is one big reason for that.
+
+##Twitter Data
+
+```{r}
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(gtable)
+
+```
+
+```{r elon_musk}
+elon_musk <- read_csv("data/Twitter_Data/Elon Musk (@elonmusk) _ Twitter.csv") 
+
+elon_musk <- elon_musk %>% distinct()
+
+problems(elon_musk)
+
+(by_date <- elon_musk %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) )
+
+(daily_res <- by_date %>% group_by(year, month, day) %>% summarise(
+  dailyLikes = sum(likes),
+  dailyReplies = sum(replies),
+  dailyRetweets = sum(retweets)
+  )  ) 
+
+(ret_likes <- daily_res %>%  ggplot(aes( dailyRetweets, dailyLikes ) ) + geom_point( aes(color = year),position = "jitter" ) + geom_smooth(se = FALSE) )
+
+(rep_likes <-  daily_res %>%  ggplot(aes( dailyReplies, dailyLikes ) ) + geom_point(aes(color = year),position = "jitter") + geom_smooth(se = FALSE) )
+
+#(g <- rbind(ret_likes, rep_likes, size="second"   ))
+
+```
+
+```{r}
+cnbc_tsla <- read_csv("data/Twitter_Data/CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search.csv") 
+#(cnbc_tsla <- cnbc_tsla %>%  distinct()  )
+
+cnbc_tsla <- cnbc_tsla %>% filter(!duplicated(text) == TRUE)
+problems(cnbc_tsla)
+
+
+(cnbc_by_date <- cnbc_tsla %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) )
+
+(cnbc_daily_res_table <- cnbc_by_date %>% group_by(year, month, day) %>% summarise(
+  c_dailyLikes = sum(likes),
+  c_dailyRep = sum(replies),
+  c_dailyRet = sum(retweets)
+  )  ) 
+
+(cnbc_ret_likes <- cnbc_daily_res_table %>%  ggplot(aes( c_dailyRet, c_dailyLikes ) ) + geom_point(aes(color = year), position = "jitter") + geom_smooth() )
+
+(cnbc_rep_likes <-  cnbc_daily_res_table %>%  ggplot(aes( c_dailyRep, c_dailyLikes ) ) + geom_point(aes(color = year), position = "jitter") + geom_smooth() )
+```
+
+
+```{r tesla_elon}
+tesla_elon <- read_csv("data/Twitter_Data/(_) @elonmusk @Tesla - Twitter Search.csv")
+
+problems(tesla_elon)
+(by_date <- tesla_elon %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) )
+
+(daily_res <- by_date %>% group_by(year, month, day) %>% summarise(
+  dailyLikes = sum(likes),
+  dailyReplies = sum(replies),
+  dailyRetweets = sum(retweets)
+  )  ) 
+
+(ret_likes <- daily_res %>%  ggplot(aes( dailyRetweets, dailyLikes ) ) + geom_point( aes(color = year ),position = "jitter" ) + geom_smooth(se = FALSE) )
+
+(rep_likes <-  daily_res %>%  ggplot(aes( dailyReplies, dailyLikes ) ) + geom_point(aes(color = year), position = "jitter", size=I(0.1) ) + geom_smooth(se = FALSE) )
+
+
+```
+
+#Regression
+
+##daily number regession
+
+First, we did linear regression of changes of daily close price on numbers of twitters each day.
+
+
+```{r }
+daily_number<-elon_musk%>%mutate(Date=as.character.Date(time))%>%group_by(Date)%>%count()
+ggplot(daily_number)+geom_histogram(aes(n))
+
+daily_number_price<-daily_number%>%left_join(daily_price,by=c("Date"))
+
+mod_num1<-lm(log(Close)~n,data=daily_number_price)
+coef1<-coef(mod_num1)
+summary(mod_num1)
+ggplot(daily_number_price,aes(x=n,y=log(Close)))+geom_point()+
+  geom_abline(intercept = coef1[1],slope = coef1[2],color="red")
+
+
+```
+
+```{r}
+cnbc_tsla<-cnbc_tsla%>%filter(!(duplicated(text)==TRUE))
+daily_number_cnbc<-cnbc_tsla%>%mutate(Date=as.character.Date(time))%>%group_by(Date)%>%count()
+ggplot(daily_number_cnbc)+geom_histogram(aes(n))
+
+daily_number_price_cnbc<-daily_number_cnbc%>%left_join(daily_price,by=c("Date"))
+
+mod_num2<-lm(log(Close)~n,data=daily_number_price_cnbc)
+coef2<-coef(mod_num2)
+summary(mod_num2)
+ggplot(daily_number_price_cnbc,aes(x=n,y=log(Close)))+geom_point()+
+  geom_abline(intercept = coef2[1],slope = coef2[2],color="red")
+
+
+price_lag<-daily_price%>%mutate(change=(Close/lag(Close,1)-1))
+lag<-daily_number_price_cnbc%>%left_join(price_lag,by=c("Date"))
+mod_num3<-lm(change~n,data=lag)
+coef3<-coef(mod_num3)
+ggplot(lag,aes(x=n,y=change))+geom_point()+
+  geom_abline(intercept = coef3[1],slope = coef3[2],color="red")
+```
+
+
+We found out that there are several days when the number of twitter about Tesla was extremely high. So, we filtered these outliers to see what happened on these dates.
+
+```{r}
+daily_number_price_cnbc%>%arrange(desc(n))
+cnbc_tsla%>%filter(time=="2018-05-03")
+cnbc_tsla%>%filter(time=="2018-08-08")
+```
+
+##multivariate regression
+
+Then, we gave sentiment scores to each twitter text and regress them on the price change.
+
+###sentiment scores
+
+```{r}
+library(syuzhet)
+library(SnowballC)
+library(NLP)
+library(tm)
+library(wordcloud)
+```
+
+```{r preprocessing}
+name <- "Elon Musk (@elonmusk) _ Twitter"
+# name <- "CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search"
+# name <- "(_) @elonmusk @Tesla - Twitter Search"
+import_path <- paste("data/Twitter_Data/", name, ".csv", sep='')
+tweets <- read_csv(import_path) %>% 
+  mutate(text = str_to_lower(text)) %>% 
+  mutate(text = str_replace_all(text, "https?.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "[#@].*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "pic.twitter.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "rt","")) %>% 
+  mutate(text = str_replace_all(text, "[[:punct:]]","")) %>% 
+  mutate(text = str_replace_all(text, "[ |\t]{2,}","")) %>% 
+  mutate(text = str_replace_all(text, "^\\s","")) %>% # Remove blank spaces at the beginning
+  mutate(text = str_replace_all(text, "\\s$", "")) %>% #Remove blank spaces at the end
+  mutate(text = removeWords(text,stopwords()))
+ 
+sentiment_scores <- get_nrc_sentiment(tweets$text) 
+
+tweets_with_scores <- merge(tweets, sentiment_scores, by="row.names", all.x=TRUE) %>% 
+  select(-1)
+
+export_path <- paste("data/Twitter_Data/", name, "_with_scores.csv", sep='')
+write.table(tweets_with_scores, file = export_path, sep=",", row.names=FALSE)
+# all_words <- paste(tweets$text, collapse=', ' )
+# 
+# wordcloud(all_words,min.freq = 1,colors=brewer.pal(8, "Dark2"),random.color = TRUE,max.words = 500)
+# word.df <- as.vector(tweets.df2)
+# 
+# emotion.df <- get_nrc_sentiment(word.df)
+# 
+# emotion.df2 <- cbind(tweets.df2, emotion.df) 
+# 
+# head(emotion.df2)
+```
+ 
+
+
+```{r}
+
+cnbc_score<-read_csv("data/TWitter_Data/CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search_with_scores.csv")
+
+sentiment_cnbc<-list(x=c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive"),y=cnbc_score%>%
+  select(anger,anticipation,disgust,fear,joy,sadness,surprise,trust,negative,positive)%>%
+  colSums())
+sentiment_cnbc<-as_tibble(sentiment_cnbc)
+colnames(sentiment_cnbc)<-c("sentiment","value")
+
+ggplot(sentiment_cnbc)+geom_col(aes(sentiment,value,fill=sentiment))
+```
+
+###multivariate regression
+
+
+```{r multivariate regression}
+price_lag <- daily_price %>% 
+  mutate(log_close = log(Close)) %>% 
+  mutate(change=(Close/lag(Close,1)-1))
+
+tweets_with_scores <- tweets_with_scores %>%
+  mutate(Date=as.Date(time, format = "%d.%m.%Y")) %>% 
+  select(Date, everything()) %>% 
+  select(-time)
+
+emotions <- colnames(tweets_with_scores)[6:15] %>% 
+  paste(shQuote(., type="sh"), collapse=", ")
+
+summarized_tweets_with_scores <- tweets_with_scores %>% 
+  group_by(Date) %>% 
+  summarize(
+    anger = sum(anger),     
+    anticipation = sum(anticipation),
+    disgust = sum(disgust),   
+    fear = sum(fear),     
+    joy = sum(joy),
+    sadness = sum(sadness),
+    surprise = sum(surprise), 
+    trust = sum(trust),
+    negative = sum(negative),
+    positive = sum(positive)
+  )
+  # colSums(tweets_with_scores[, c("anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust", "negative", "positive")], na.rm=TRUE)
+  
+# for (i in colnames(tweets_with_scores)[6:15]) {
+#   col_name = paste(i, "sum", sep='_')
+#   print(col_name)
+#   tweets_with_scores <- tweets_with_scores %>% 
+#     group_by(date)%>%
+#     mutate(!!col_name := sum(i)) %>% 
+#     group_by(date)
+# }
+
+daily_price_with_scores <- price_lag %>% 
+  mutate(Date=as.Date(Date)) %>% 
+  left_join(summarized_tweets_with_scores, by="Date") %>% 
+  .[complete.cases(.), ]
+
+filtered_daily_price_with_scores <- daily_price_with_scores %>% 
+  filter(negative>2.5) %>% 
+  filter(Date>as.Date("2018-03-20"))
+
+(mod_num2<-lm(change~anger+anticipation+disgust+fear+joy+sadness+surprise+trust+negative+positive,data=filtered_daily_price_with_scores))
+
+(mod_num2<-lm(change~anger+anticipation+disgust+fear+joy+sadness+surprise+trust+negative+positive,data=daily_price_with_scores))
+
+(daily_price_with_scores %>%  
+    mutate(lag_close = lag(Close,0)) %>% 
+    filter(negative>2.5) %>% 
+    filter(Date>as.Date("2018-03-20")) %>% 
+    ggplot(aes(x=Date)) + 
+    geom_line(aes(y=negative,color="blue"))+
+    geom_line(aes(y=change*200,color="red"))+
+    # geom_line() +
+    scale_y_continuous(sec.axis = sec_axis(~.*10,name="stock")))
+
+(daily_price_with_scores %>%  
+    mutate(lag_close = lag(Close,0)) %>% 
+    filter(positive>2.5) %>% 
+    filter(Date>as.Date("2018-03-20")) %>% 
+    ggplot(aes(x=Date)) + 
+    geom_line(aes(y=positive,color="blue"))+
+    geom_line(aes(y=change*200,color="red"))+
+    # geom_line() +
+    scale_y_continuous(sec.axis = sec_axis(~.*10,name="stock")))
+
+daily_price_with_scores %>% gather("id", "value", 7:16) %>% 
+  ggplot(., aes(Date, value))+
+  geom_point(position = "jitter")+
+  geom_smooth(method = "lm", se=FALSE, color="blue")+
+  facet_wrap(~id)
+(ret_likes <- daily_res %>%  ggplot(aes( dailyRetweets, dailyLikes ) ) + geom_point( aes(color = year ),position = "jitter" ) + geom_smooth(se = FALSE))
+```
+```{r minute}
+# name <- "Elon Musk (@elonmusk) _ Twitter"
+# name <- "CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search"
+# name <- "(_) @elonmusk @Tesla - Twitter Search"
+tweets <- read_csv("Data/Stock_Data/elon_combined.csv") %>% 
+  mutate(text = str_to_lower(text)) %>% 
+  mutate(text = str_replace_all(text, "https?.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "[#@].*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "pic.twitter.*\\s?","")) %>% 
+  mutate(text = str_replace_all(text, "rt","")) %>% 
+  mutate(text = str_replace_all(text, "[[:punct:]]","")) %>% 
+  mutate(text = str_replace_all(text, "[ |\t]{2,}","")) %>% 
+  mutate(text = str_replace_all(text, "^\\s","")) %>% # Remove blank spaces at the beginning
+  mutate(text = str_replace_all(text, "\\s$", "")) %>% #Remove blank spaces at the end
+  mutate(text = removeWords(text,stopwords()))
+ 
+sentiment_scores <- get_nrc_sentiment(tweets$text) 
+
+tweets_with_scores <- merge(tweets, sentiment_scores, by="row.names", all.x=TRUE) %>% 
+  select(-1)
+
+price_lag <- minutely_price %>% 
+  mutate(log_close = log(Close)) %>% 
+  mutate(change=(Close/lag(Close,1)-1))
+
+new_tweets_with_scores <- tweets_with_scores %>%
+  as.tibble() %>% 
+  mutate(minute_time = as.POSIXct(minute_time, format="%m/%d/%y %H:%M")) #, format="%d/%m/%Y %H:%M"
+
+emotions <- colnames(tweets_with_scores)[6:15] %>% 
+  paste(shQuote(., type="sh"), collapse=", ")
+
+daily_price_with_scores <- price_lag %>% 
+  mutate(Date=as.POSIXct(Date)) %>% 
+  left_join(new_tweets_with_scores, by=c("Date"= "minute_time")) %>% 
+  .[complete.cases(.), ]
+
+new_tweets_with_scores <- tweets_with_scores %>% 
+  mutate(change=(Close/lag(Close,1)-1))
+
+(mod_num2<-lm(change~anger+anticipation+disgust+fear+joy+sadness+surprise+trust+negative+positive,data=new_tweets_with_scores))
+
+(mod_num2<-lm(change~anger+anticipation+disgust+fear+joy+sadness+surprise+trust+negative+positive,data=daily_price_with_scores))
+
+(new_tweets_with_scores %>%  
+    ggplot(aes(x=Date)) + 
+    # geom_line(aes(y=negative*200,color="blue"))+
+    # geom_line(aes(y=positive,color="red"))+
+    geom_line(aes(y=Volume,color="black"))+
+    scale_y_continuous(sec.axis = sec_axis(~.*10,name="stock")))
+
+(daily_price_with_scores %>%  
+    mutate(lag_close = lag(Close,0)) %>% 
+    filter(positive>2.5) %>% 
+    filter(Date>as.Date("2018-03-20")) %>% 
+    ggplot(aes(x=Date)) + 
+    geom_line(aes(y=positive,color="blue"))+
+    geom_line(aes(y=change,color="red"))+
+    # geom_line() +
+    scale_y_continuous(sec.axis = sec_axis(~.*10,name="stock")))
+
+daily_price_with_scores %>% gather("id", "value", 7:16) %>% 
+  ggplot(., aes(Date, value))+
+  geom_point(position = "jitter")+
+  geom_smooth(method = "lm", se=FALSE, color="blue")+
+  facet_wrap(~id)
+(ret_likes <- daily_res %>%  ggplot(aes( dailyRetweets, dailyLikes ) ) + geom_point( aes(color = year ),position = "jitter" ) + geom_smooth(se = FALSE))
+```
+

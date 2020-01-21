@@ -1,0 +1,19 @@
+---
+title: "get_twitter_data"
+author: "Zack Light"
+date: "November 12, 2018"
+output: html_document
+---
+
+```{r}
+library(twitteR)
+setup_twitter_oauth("API key", "API secret")
+```
+
+```{r}
+library(curl)
+req <- curl_fetch_memory("https://newsapi.org/v2/top-headlines?country=us&apiKey=9281851ecc7d4eeabf4f2e53f54a8d57")
+
+content <- rawToChar(req$content)
+```
+

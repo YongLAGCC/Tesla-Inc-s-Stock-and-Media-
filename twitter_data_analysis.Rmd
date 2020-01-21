@@ -1,0 +1,79 @@
+---
+title: "twitter_data_analysis"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(gtable)
+
+
+```
+
+```{r elon_musk}
+elon_musk <- read_csv("data/Twitter_Data/Elon Musk (@elonmusk) _ Twitter.csv") 
+
+elon_musk <- elon_musk %>% distinct()
+
+problems(elon_musk)
+
+by_date <- elon_musk %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) 
+
+daily_res <- by_date %>% group_by(year, month, day) %>% summarise(
+  dailyLikes = sum(likes),
+  dailyReplies = sum(replies),
+  dailyRetweets = sum(retweets)
+  )   
+
+(ret_likes <- daily_res %>%  ggplot(aes( log(dailyRetweets), log(dailyLikes) ) ) + geom_point( aes(color = year),position = "jitter" ) + geom_smooth(se = FALSE) )
+
+(rep_likes <-  daily_res %>%  ggplot(aes( log(dailyReplies), log(dailyLikes) ) ) + geom_point(aes(color = year),position = "jitter") + geom_smooth(se = FALSE) )
+
+#(g <- rbind(ret_likes, rep_likes, size="second"   ))
+
+```
+
+```{r}
+cnbc_tsla <- read_csv("data/Twitter_Data/CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search.csv") 
+#(cnbc_tsla <- cnbc_tsla %>%  distinct()  )
+
+cnbc_tsla <- cnbc_tsla %>% filter(!duplicated(text) == TRUE)
+problems(cnbc_tsla)
+
+
+(cnbc_by_date <- cnbc_tsla %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) )
+
+(cnbc_daily_res_table <- cnbc_by_date %>% group_by(year, month, day) %>% summarise(
+  c_dailyLikes = sum(likes),
+  c_dailyRep = sum(replies),
+  c_dailyRet = sum(retweets)
+  )  ) 
+
+(cnbc_ret_likes <- cnbc_daily_res_table %>%  ggplot(aes( log(c_dailyRet), log(c_dailyLikes) ) ) + geom_point(aes(color = year), position = "jitter") + geom_smooth() )
+
+(cnbc_rep_likes <-  cnbc_daily_res_table %>%  ggplot(aes( log(c_dailyRep), log(c_dailyLikes) ) ) + geom_point(aes(color = year), position = "jitter") + geom_smooth()  )
+```
+
+
+```{r tesla_elon}
+tesla_elon <- read_csv("data/Twitter_Data/(_) @elonmusk @Tesla - Twitter Search.csv")
+
+problems(tesla_elon) 
+by_date <- tesla_elon %>%  separate(time, into = c("year", "month", "day"), sep = "-" ) 
+
+daily_res <- by_date %>% group_by(year, month, day) %>% summarise(
+  dailyLikes = sum(likes),
+  dailyReplies = sum(replies),
+  dailyRetweets = sum(retweets)
+  )   
+
+(ret_likes <- daily_res 
+  %>%  ggplot(aes( log(dailyRetweets), log(dailyLikes) ) ) + geom_point( aes(color = year ),position = "jitter" ) + geom_smooth(se = FALSE) ) 
+
+(rep_likes <-  daily_res %>%  ggplot(aes( log(dailyReplies), log(dailyLikes) ) ) + geom_point(aes(color = year), position = "jitter" ) + geom_smooth( se = FALSE)  )
+
+
+```
+

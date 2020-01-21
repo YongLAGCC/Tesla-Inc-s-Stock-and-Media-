@@ -1,0 +1,21 @@
+---
+title: "score graph"
+author: "Official Answers"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+library(readr)
+
+cnbc_score<-read_csv("data/TWitter_Data/CNBC TSLA News since_2018-09-11 until_2018-11-11 - Twitter Search_with_scores.csv")
+
+sentiment_cnbc<-list(x=c("anger","anticipation","disgust","fear","joy","sadness","surprise","trust","negative","positive"),y=cnbc_score%>%
+  select(anger,anticipation,disgust,fear,joy,sadness,surprise,trust,negative,positive)%>%
+  colSums())
+sentiment_cnbc<-as_tibble(sentiment_cnbc)
+colnames(sentiment_cnbc)<-c("sentiment","value")
+
+ggplot(sentiment_cnbc)+geom_col(aes(sentiment,value,fill=sentiment))
+```

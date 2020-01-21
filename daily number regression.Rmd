@@ -1,0 +1,46 @@
+---
+title: "daily twitter numbers"
+author: "Official Answers"
+output: html_document
+---
+```{r }
+daily_number<-elon_musk%>%mutate(Date=as.character.Date(time))%>%group_by(Date)%>%count()
+ggplot(daily_number)+geom_histogram(aes(n))
+
+daily_number_price<-daily_number%>%left_join(daily_price,by=c("Date"))
+
+mod_num1<-lm(log(Close)~n,data=daily_number_price)
+coef1<-coef(mod_num1)
+summary(mod_num1)
+ggplot(daily_number_price,aes(x=n,y=log(Close)))+geom_point()+
+  geom_abline(intercept = coef1[1],slope = coef1[2],color="red")
+
+```
+
+```{r}
+cnbc_tsla<-cnbc_tsla%>%filter(!(duplicated(text)==TRUE))
+daily_number_cnbc<-cnbc_tsla%>%mutate(Date=as.character.Date(time))%>%group_by(Date)%>%count()
+ggplot(daily_number_cnbc)+geom_histogram(aes(n))
+
+daily_number_price_cnbc<-daily_number_cnbc%>%left_join(daily_price,by=c("Date"))
+
+mod_num2<-lm(log(Close)~n,data=daily_number_price_cnbc)
+coef2<-coef(mod_num2)
+summary(mod_num2)
+ggplot(daily_number_price_cnbc,aes(x=n,y=log(Close)))+geom_point()+
+  geom_abline(intercept = coef2[1],slope = coef2[2],color="red")
+
+
+price_lag<-daily_price%>%mutate(change=(Close/lag(Close,1)-1))
+lag<-daily_number_price_cnbc%>%left_join(price_lag,by=c("Date"))
+mod_num3<-lm(change~n,data=lag)
+coef3<-coef(mod_num3)
+ggplot(lag,aes(x=n,y=change))+geom_point()+
+  geom_abline(intercept = coef3[1],slope = coef3[2],color="red")
+```
+
+```{r}
+daily_number_price_cnbc%>%arrange(desc(n))
+cnbc_tsla%>%filter(time=="2018-05-03")
+cnbc_tsla%>%filter(time=="2018-08-08")
+```
